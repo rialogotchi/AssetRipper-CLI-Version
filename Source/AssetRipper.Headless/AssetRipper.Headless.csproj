@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<AssemblyName>AssetRipper.Headless</AssemblyName>
+		<RootNamespace>AssetRipper.Headless</RootNamespace>
+		<ServerGarbageCollection>true</ServerGarbageCollection>
+		<OptimizationPreference>Size</OptimizationPreference>
+		<PublishAot>true</PublishAot>
+		<CETCompat>false</CETCompat>
+		<TrimmerSingleWarn>false</TrimmerSingleWarn>
+		<OutputPath>..\0Bins\AssetRipper.Headless\$(Configuration)\</OutputPath>
+		<IntermediateOutputPath>..\0Bins\obj\AssetRipper.Headless\$(Configuration)\</IntermediateOutputPath>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+		<EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+		<EventSourceSupport>false</EventSourceSupport>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+		<MetricsSupport>false</MetricsSupport>
+		<XmlResolverIsNetworkingEnabledByDefault>false</XmlResolverIsNetworkingEnabledByDefault>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DebuggerSupport>false</DebuggerSupport>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AssetRipper.Export.PrimaryContent\AssetRipper.Export.PrimaryContent.csproj" />
+		<ProjectReference Include="..\AssetRipper.Export.UnityProjects\AssetRipper.Export.UnityProjects.csproj" />
+	</ItemGroup>
+
+</Project>

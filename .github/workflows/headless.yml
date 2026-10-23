@@ -1,0 +1,105 @@
+name: Build Headless
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: "Publish the builds as a GitHub Release"
+        type: boolean
+        default: false
+      tag_name:
+        description: "Release tag (only used when create_release is true)"
+        type: string
+        default: "headless-latest"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare_release:
+    if: ${{ inputs.create_release }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "AssetRipper Headless $TAG" \
+              --notes "Command line (no web UI) build of AssetRipper. Run \`AssetRipper.Headless --help\`."
+
+  build:
+    needs: [prepare_release]
+    # run even when prepare_release was skipped, but not when it failed
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ${{ matrix.config.os }}
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: win_x64, os: windows-latest, runtime: win-x64, executable: AssetRipper.Headless.exe, archive: zip }
+          - { name: win_arm64, os: windows-latest, runtime: win-arm64, executable: AssetRipper.Headless.exe, archive: zip }
+          - { name: linux_x64, os: ubuntu-22.04, runtime: linux-x64, executable: AssetRipper.Headless, archive: tar }
+          - { name: linux_arm64, os: ubuntu-22.04-arm, runtime: linux-arm64, executable: AssetRipper.Headless, archive: tar }
+          - { name: mac_x64, os: macos-14, runtime: osx-x64, executable: AssetRipper.Headless, archive: tar }
+          - { name: mac_arm64, os: macos-14, runtime: osx-arm64, executable: AssetRipper.Headless, archive: tar }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish
+        run: dotnet publish -c Release -r ${{ matrix.config.runtime }}
+        working-directory: ./Source/AssetRipper.Headless/
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          PUBLISH_DIR="./Source/0Bins/AssetRipper.Headless/Release/${{ matrix.config.runtime }}/publish"
+          PKG_DIR="./package"
+          mkdir -p "$PKG_DIR"
+          ls -la "$PUBLISH_DIR"
+          cp "$PUBLISH_DIR/${{ matrix.config.executable }}" "$PKG_DIR/"
+          for pattern in '*.dll' '*.so' '*.dylib'; do
+            find "$PUBLISH_DIR" -maxdepth 1 -name "$pattern" -exec cp {} "$PKG_DIR/" \;
+          done
+          date -u > "$PKG_DIR/compile_time.txt"
+          ls -la "$PKG_DIR"
+
+      - name: Create archive (zip)
+        if: ${{ matrix.config.archive == 'zip' }}
+        shell: bash
+        working-directory: ./package
+        run: 7z a -tzip "../AssetRipper_Headless_${{ matrix.config.name }}.zip" .
+
+      - name: Create archive (tar.xz)
+        if: ${{ matrix.config.archive == 'tar' }}
+        shell: bash
+        working-directory: ./package
+        run: tar cJf "../AssetRipper_Headless_${{ matrix.config.name }}.tar.xz" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: AssetRipper_Headless_${{ matrix.config.name }}.${{ matrix.config.archive == 'zip' && 'zip' || 'tar.xz' }}
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload to release
+        if: ${{ inputs.create_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag_name }}
+        run: gh release upload "$TAG" "AssetRipper_Headless_${{ matrix.config.name }}.${{ matrix.config.archive == 'zip' && 'zip' || 'tar.xz' }}" --repo "$GITHUB_REPOSITORY" --clobber
